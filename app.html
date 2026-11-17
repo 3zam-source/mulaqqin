@@ -1,0 +1,315 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#050807">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="ملقّن">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>ملقّن</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap">
+<style>
+/* Layout: editor page with sticky start button; full-screen reading view with a fixed guide band at 38% height and auto-scrolling text. */
+:root{
+  --bg:#f3f4f1; --fg:#17201c; --muted:#56635d; --surface:#ffffff; --line:#d3d9d4;
+  --accent:#0b7a5a; --accent-fg:#ffffff;
+  --pt-bg:#050807; --pt-fg:#f5f7f4; --pt-guide:#e8b73a; --pt-guide-fg:#1a1403;
+  --pt-ui:#141b17; --pt-ui-fg:#e8ede9; --pt-line:#2b3832;
+  --font:'Tajawal',system-ui,'Segoe UI',Tahoma,sans-serif;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0f1512; --fg:#e8ede9; --muted:#93a19a; --surface:#17201b; --line:#2a3630;
+    --accent:#3ccf9b; --accent-fg:#04140d; color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0f1512; --fg:#e8ede9; --muted:#93a19a; --surface:#17201b; --line:#2a3630;
+  --accent:#3ccf9b; --accent-fg:#04140d; color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{
+  background:var(--bg); color:var(--fg); font-family:var(--font); font-size:16px; line-height:1.6;
+  padding-left:max(16px, env(safe-area-inset-left, 0px));
+  padding-right:max(16px, env(safe-area-inset-right, 0px));
+  padding-block:0;
+}
+.editor{max-width:720px; margin:0 auto; padding-top:20px}
+h1{font-size:30px; font-weight:800; margin:0 0 4px; letter-spacing:0}
+.sub{margin:0 0 18px; color:var(--muted); text-wrap:balance}
+label.cap{display:block; font-weight:700; margin-bottom:6px}
+textarea{
+  width:100%; height:300px; min-height:160px; resize:vertical; padding:14px;
+  font-family:var(--font); font-size:18px; line-height:1.8; color:var(--fg);
+  background:var(--surface); border:1px solid var(--line); border-radius:10px;
+}
+textarea:focus-visible, button:focus-visible, input:focus-visible{outline:3px solid var(--accent); outline-offset:2px}
+.meta{display:flex; justify-content:space-between; gap:12px; margin:8px 0 18px; color:var(--muted); font-size:14px}
+.settings{display:grid; gap:14px; padding:16px; background:var(--surface); border:1px solid var(--line); border-radius:10px}
+.row{display:grid; grid-template-columns:5.5rem minmax(0,1fr) 3.2rem; align-items:center; gap:12px}
+.row .val{text-align:end; font-variant-numeric:tabular-nums; font-weight:700}
+.row input[type=range]{width:100%; accent-color:var(--accent); min-width:0}
+.checks{display:flex; flex-wrap:wrap; gap:10px 24px}
+.checks label{display:flex; align-items:center; gap:8px; cursor:pointer}
+.checks input{width:20px; height:20px; accent-color:var(--accent)}
+.dock{position:sticky; bottom:0; padding-block:14px; margin-top:16px; background:linear-gradient(to top, var(--bg) 70%, transparent)}
+.start{
+  width:100%; min-height:56px; border:0; border-radius:12px; cursor:pointer;
+  background:var(--accent); color:var(--accent-fg); font:800 20px var(--font);
+}
+.hint{margin:10px 0 0; font-size:14px; color:var(--muted)}
+
+/* Reading view */
+.prompter{position:fixed; inset:0; z-index:50; background:var(--pt-bg); color:var(--pt-fg); overflow:hidden}
+.stage{position:absolute; inset:0; overflow:hidden; touch-action:none; cursor:grab; user-select:none; -webkit-user-select:none}
+.flip{position:absolute; inset:0}
+.flip.mirror{transform:scaleX(-1)}
+.inner{
+  padding-left:max(20px, env(safe-area-inset-left, 0px)); padding-right:max(20px, env(safe-area-inset-right, 0px));
+  will-change:transform;
+}
+.copy{
+  margin:0 auto; max-width:1100px; white-space:pre-wrap; overflow-wrap:anywhere;
+  font-size:var(--size); line-height:1.7; font-weight:700;
+}
+.guide{
+  position:absolute; inset-inline:0; pointer-events:none;
+  background:color-mix(in srgb, var(--pt-guide) 9%, transparent);
+  border-block:1px solid color-mix(in srgb, var(--pt-guide) 45%, transparent);
+}
+.prog{position:absolute; top:env(safe-area-inset-top, 0px); inset-inline-start:0; height:3px; width:0; background:var(--pt-guide); pointer-events:none}
+.count{
+  position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+  font-size:min(40vw, 240px); font-weight:800; color:var(--pt-guide); pointer-events:none;
+  background:color-mix(in srgb, var(--pt-bg) 70%, transparent);
+}
+.bar{
+  position:absolute; left:0; right:0; bottom:0; display:flex; flex-wrap:wrap; justify-content:center; gap:8px;
+  padding-top:28px;
+  padding-left:max(12px, env(safe-area-inset-left, 0px)); padding-right:max(12px, env(safe-area-inset-right, 0px));
+  padding-bottom:calc(12px + env(safe-area-inset-bottom, 0px));
+  background:linear-gradient(to top, color-mix(in srgb, var(--pt-bg) 94%, transparent) 55%, transparent);
+}
+.bar button{
+  min-height:46px; min-width:46px; padding:0 14px; border-radius:10px; cursor:pointer;
+  background:var(--pt-ui); color:var(--pt-ui-fg); border:1px solid var(--pt-line); font:700 16px var(--font);
+}
+.bar .play{background:var(--pt-guide); color:var(--pt-guide-fg); border-color:transparent; min-width:96px; font-weight:800}
+.bar .lvl{display:flex; align-items:center; gap:6px; color:var(--pt-ui-fg); font-weight:700; font-variant-numeric:tabular-nums}
+.bar .lvl span{min-width:2.4em; text-align:center}
+@media (prefers-reduced-motion: reduce){ *{scroll-behavior:auto} }
+</style>
+
+
+<style>
+html{background:#050807}
+:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+body{margin:0}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<div dir="rtl" lang="ar">
+  <main class="editor" id="editor">
+    <h1>ملقّن</h1>
+    <p class="sub">الصق النص، اضغط ابدأ، وينزل من نفسه مثل شريط الأخبار.</p>
+
+    <label class="cap" for="text">النص</label>
+    <textarea id="text" spellcheck="false" placeholder="اكتب أو الصق النص هنا"></textarea>
+    <div class="meta"><span id="words"></span><span id="mins"></span></div>
+
+    <section class="settings" aria-label="الإعدادات">
+      <div class="row"><label for="size">حجم الخط</label><input id="size" type="range" min="28" max="120" step="2"><span class="val" id="sizeV"></span></div>
+      <div class="row"><label for="speed">السرعة</label><input id="speed" type="range" min="1" max="12" step="1"><span class="val" id="speedV"></span></div>
+      <div class="checks">
+        <label><input id="countdown" type="checkbox"> عدّ تنازلي قبل البدء</label>
+        <label><input id="mirror" type="checkbox"> عكس النص (للزجاج العاكس)</label>
+      </div>
+    </section>
+
+    <div class="dock">
+      <button class="start" id="start" type="button">ابدأ القراءة</button>
+      <p class="hint">أثناء القراءة: اضغط على الشاشة للإيقاف والتشغيل، واسحب لتحريك النص.</p>
+    </div>
+  </main>
+
+  <section class="prompter" id="prompter" hidden aria-label="شاشة القراءة">
+    <div class="stage" id="stage">
+      <div class="flip" id="flip">
+        <div class="guide" id="guide"></div>
+        <div class="inner" id="inner"><div class="copy" id="copy"></div></div>
+      </div>
+    </div>
+    <div class="prog" id="prog"></div>
+    <div class="count" id="count" hidden></div>
+    <div class="bar" id="bar">
+      <button type="button" id="close">إغلاق</button>
+      <button type="button" id="restart">من البداية</button>
+      <button type="button" id="smaller" aria-label="تصغير الخط">أ−</button>
+      <button type="button" id="bigger" aria-label="تكبير الخط">أ+</button>
+      <div class="lvl"><button type="button" id="slower" aria-label="أبطأ">−</button><span id="lvl"></span><button type="button" id="faster" aria-label="أسرع">+</button></div>
+      <button type="button" class="play" id="play">إيقاف</button>
+    </div>
+  </section>
+</div>
+
+<script>
+(function(){
+  var SAMPLE = "مرحباً بكم في هذه النشرة.\n\nهذا نص تجريبي لتجربة الملقّن. امسحه والصق نصك الخاص، ثم اضغط ابدأ القراءة.\n\nاضبط حجم الخط حتى يصير مريحاً لعينيك من مسافة القراءة، واضبط السرعة على قدر كلامك. إذا وقفت وسط النص اضغط على الشاشة فيتوقف، واضغط مرة ثانية ليكمل من نفس المكان.\n\nشكراً لكم على المتابعة.";
+  var KEY = "teleprompter-settings-v1";
+  var st = { text: SAMPLE, size: 48, speed: 6, mirror: false, countdown: true };
+  try { var saved = JSON.parse(localStorage.getItem(KEY) || "null"); if (saved && typeof saved === "object") { for (var k in st) if (k in saved) st[k] = saved[k]; } } catch (e) {}
+  function save(){ try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (e) {} }
+  function $(id){ return document.getElementById(id); }
+
+  var text=$("text"), size=$("size"), speed=$("speed"), mirror=$("mirror"), countdown=$("countdown");
+  var prompter=$("prompter"), stage=$("stage"), flip=$("flip"), inner=$("inner"), copy=$("copy"), guide=$("guide");
+  var prog=$("prog"), count=$("count"), playBtn=$("play"), lvl=$("lvl");
+
+  function sync(){
+    text.value = st.text; size.value = st.size; speed.value = st.speed;
+    mirror.checked = st.mirror; countdown.checked = st.countdown;
+    $("sizeV").textContent = st.size; $("speedV").textContent = st.speed;
+    stats();
+  }
+  function stats(){
+    var w = st.text.trim() ? st.text.trim().split(/\s+/).length : 0;
+    $("words").textContent = w + " كلمة";
+    var m = w / 130;
+    $("mins").textContent = w === 0 ? "" : (m < 1 ? "أقل من دقيقة" : "حوالي " + Math.round(m) + " دقيقة");
+  }
+  text.addEventListener("input", function(){ st.text = text.value; stats(); save(); });
+  size.addEventListener("input", function(){ st.size = +size.value; $("sizeV").textContent = st.size; save(); });
+  speed.addEventListener("input", function(){ st.speed = +speed.value; $("speedV").textContent = st.speed; save(); });
+  mirror.addEventListener("change", function(){ st.mirror = mirror.checked; save(); });
+  countdown.addEventListener("change", function(){ st.countdown = countdown.checked; save(); });
+
+  var pos = 0, maxPos = 0, playing = false, last = 0, raf = 0, cdToken = 0, wake = null;
+
+  function pxPerSec(){ return st.speed * st.size * 0.11; }
+  function apply(){
+    inner.style.transform = "translateY(" + (-pos) + "px)";
+    prog.style.width = (maxPos > 0 ? Math.min(100, pos / maxPos * 100) : 0) + "%";
+  }
+  function layout(){
+    var h = stage.clientHeight;
+    var lh = st.size * 1.7;
+    prompter.style.setProperty("--size", st.size + "px");
+    guide.style.top = Math.round(h * 0.38) + "px";
+    guide.style.height = Math.round(lh) + "px";
+    inner.style.paddingTop = Math.round(h * 0.38) + "px";
+    inner.style.paddingBottom = Math.round(h * 0.7) + "px";
+    maxPos = Math.max(0, inner.offsetHeight - h * 0.85);
+    if (pos > maxPos) pos = maxPos;
+    lvl.textContent = st.speed;
+    apply();
+  }
+  function setPlaying(on){
+    playing = on;
+    playBtn.textContent = on ? "إيقاف" : (pos >= maxPos && maxPos > 0 ? "انتهى" : "تشغيل");
+    cancelAnimationFrame(raf);
+    if (on) { last = performance.now(); raf = requestAnimationFrame(tick); }
+  }
+  function tick(t){
+    if (!playing) return;
+    var dt = Math.min(0.05, (t - last) / 1000); last = t;
+    pos += pxPerSec() * dt;
+    if (pos >= maxPos) { pos = maxPos; apply(); setPlaying(false); return; }
+    apply();
+    raf = requestAnimationFrame(tick);
+  }
+  function toggle(){
+    if (cdToken) return;
+    if (!playing && pos >= maxPos && maxPos > 0) { pos = 0; apply(); }
+    setPlaying(!playing);
+  }
+  function runCountdown(done){
+    var n = 3, token = ++cdToken;
+    count.hidden = false; count.textContent = n;
+    (function step(){
+      setTimeout(function(){
+        if (token !== cdToken) return;
+        n--;
+        if (n <= 0) { count.hidden = true; cdToken = 0; done(); }
+        else { count.textContent = n; step(); }
+      }, 1000);
+    })();
+  }
+  function lock(){
+    try { if (navigator.wakeLock) navigator.wakeLock.request("screen").then(function(w){ wake = w; }, function(){}); } catch (e) {}
+  }
+  function unlock(){ try { if (wake) { wake.release(); wake = null; } } catch (e) {} }
+
+  function open(){
+    var body = st.text.trim() ? st.text : "اكتب نصاً أولاً.";
+    copy.textContent = body;
+    flip.classList.toggle("mirror", st.mirror);
+    prompter.hidden = false;
+    document.body.style.overflow = "hidden";
+    pos = 0; layout(); lock();
+    if (st.countdown) { setPlaying(false); runCountdown(function(){ setPlaying(true); }); }
+    else setPlaying(true);
+  }
+  function close(){
+    cdToken++; count.hidden = true; setPlaying(false);
+    prompter.hidden = true; document.body.style.overflow = ""; unlock();
+  }
+
+  $("start").addEventListener("click", open);
+  $("close").addEventListener("click", close);
+  $("restart").addEventListener("click", function(){ pos = 0; apply(); if (!playing && !cdToken) setPlaying(true); });
+  $("play").addEventListener("click", toggle);
+  function setSpeed(v){ st.speed = Math.max(1, Math.min(12, v)); speed.value = st.speed; $("speedV").textContent = st.speed; lvl.textContent = st.speed; save(); }
+  function setSize(v){
+    var ratio = pos / Math.max(1, st.size);
+    st.size = Math.max(28, Math.min(120, v)); size.value = st.size; $("sizeV").textContent = st.size; save();
+    layout(); pos = Math.min(maxPos, ratio * st.size); apply();
+  }
+  $("slower").addEventListener("click", function(){ setSpeed(st.speed - 1); });
+  $("faster").addEventListener("click", function(){ setSpeed(st.speed + 1); });
+  $("smaller").addEventListener("click", function(){ setSize(st.size - 6); });
+  $("bigger").addEventListener("click", function(){ setSize(st.size + 6); });
+
+  // tap to pause or resume, drag to move the text
+  var down = false, moved = false, y0 = 0, p0 = 0;
+  stage.addEventListener("pointerdown", function(e){
+    down = true; moved = false; y0 = e.clientY; p0 = pos;
+    try { stage.setPointerCapture(e.pointerId); } catch (x) {}
+  });
+  stage.addEventListener("pointermove", function(e){
+    if (!down) return;
+    var dy = e.clientY - y0;
+    if (!moved && Math.abs(dy) > 8) moved = true;
+    if (moved) { pos = Math.max(0, Math.min(maxPos, p0 - dy)); apply(); }
+  });
+  stage.addEventListener("pointerup", function(){ if (down && !moved) toggle(); down = false; });
+  stage.addEventListener("pointercancel", function(){ down = false; });
+  stage.addEventListener("wheel", function(e){ e.preventDefault(); pos = Math.max(0, Math.min(maxPos, pos + e.deltaY)); apply(); }, { passive: false });
+
+  document.addEventListener("keydown", function(e){
+    if (prompter.hidden) return;
+    if (e.key === " ") { e.preventDefault(); toggle(); }
+    else if (e.key === "Escape") close();
+    else if (e.key === "ArrowUp") { e.preventDefault(); setSpeed(st.speed + 1); }
+    else if (e.key === "ArrowDown") { e.preventDefault(); setSpeed(st.speed - 1); }
+  });
+  window.addEventListener("resize", function(){ if (!prompter.hidden) layout(); });
+  document.addEventListener("visibilitychange", function(){ if (document.hidden && playing) setPlaying(false); else if (!document.hidden && !prompter.hidden) lock(); });
+
+  sync();
+})();
+</script>
+
+<script>
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", function(){ navigator.serviceWorker.register("sw.js").catch(function(){}); });
+}
+</script>
+</body>
+</html>

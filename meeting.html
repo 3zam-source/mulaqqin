@@ -1,0 +1,295 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ملقّن الاجتماعات</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap">
+<style>
+/* Layout: editor page on the left of the workflow; the prompter itself is a strip that gets moved into a floating always-on-top window, with its first line at the top edge (closest to the webcam). */
+:root{
+  --bg:#f3f4f1; --fg:#17201c; --muted:#56635d; --surface:#ffffff; --line:#d3d9d4;
+  --accent:#0b7a5a; --accent-fg:#ffffff; --note-bg:#fff6dd; --note-fg:#5b4300;
+  --pt-bg:#050807; --pt-fg:#f5f7f4; --pt-guide:#e8b73a; --pt-guide-fg:#1a1403;
+  --pt-ui:#141b17; --pt-ui-fg:#e8ede9; --pt-line:#2b3832;
+  --font:'Tajawal',system-ui,'Segoe UI',Tahoma,sans-serif;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0f1512; --fg:#e8ede9; --muted:#93a19a; --surface:#17201b; --line:#2a3630;
+    --accent:#3ccf9b; --accent-fg:#04140d; --note-bg:#2b2410; --note-fg:#f0d98a; color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0f1512; --fg:#e8ede9; --muted:#93a19a; --surface:#17201b; --line:#2a3630;
+  --accent:#3ccf9b; --accent-fg:#04140d; --note-bg:#2b2410; --note-fg:#f0d98a; color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{margin:0; background:var(--bg); color:var(--fg); font-family:var(--font); font-size:16px; line-height:1.6}
+.page{max-width:760px; margin:0 auto; padding:28px 20px 40px}
+h1{font-size:32px; font-weight:800; margin:0 0 4px}
+.sub{margin:0 0 20px; color:var(--muted); text-wrap:balance}
+label.cap{display:block; font-weight:700; margin-bottom:6px}
+textarea{width:100%; height:260px; min-height:140px; resize:vertical; padding:14px; font-family:var(--font); font-size:18px; line-height:1.8; color:var(--fg); background:var(--surface); border:1px solid var(--line); border-radius:10px}
+textarea:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible{outline:3px solid var(--accent); outline-offset:2px}
+.meta{display:flex; justify-content:space-between; gap:12px; margin:8px 0 18px; color:var(--muted); font-size:14px}
+.settings{display:grid; gap:14px; padding:16px; background:var(--surface); border:1px solid var(--line); border-radius:10px; margin-bottom:18px}
+.row{display:grid; grid-template-columns:7rem minmax(0,1fr) 3.2rem; align-items:center; gap:12px}
+.row .val{text-align:end; font-variant-numeric:tabular-nums; font-weight:700}
+.row input[type=range]{width:100%; accent-color:var(--accent); min-width:0}
+select{min-height:40px; padding:0 10px; font:16px var(--font); color:var(--fg); background:var(--bg); border:1px solid var(--line); border-radius:8px; grid-column:2 / 4; min-width:0}
+.start{width:100%; min-height:56px; border:0; border-radius:12px; cursor:pointer; background:var(--accent); color:var(--accent-fg); font:800 20px var(--font)}
+.status{margin:10px 0 0; color:var(--muted); min-height:1.6em}
+.note{margin:0 0 14px; padding:12px 14px; border-radius:10px; background:var(--note-bg); color:var(--note-fg); font-size:15px}
+.tips{margin:22px 0 0; padding:16px 18px; padding-inline-start:36px; background:var(--surface); border:1px solid var(--line); border-radius:10px; display:grid; gap:8px; color:var(--fg)}
+.tips strong{font-weight:800}
+
+/* النافذة العائمة */
+.prompter{position:fixed; inset:0; background:var(--pt-bg); color:var(--pt-fg); overflow:hidden; font-family:var(--font)}
+.stage{position:absolute; inset:0; overflow:hidden; cursor:grab; user-select:none; -webkit-user-select:none; touch-action:none}
+.inner{padding-left:18px; padding-right:18px; will-change:transform}
+.copy{margin:0 auto; max-width:1100px; white-space:pre-wrap; overflow-wrap:anywhere; font-size:var(--size); line-height:1.6; font-weight:700; text-align:center}
+.guide{position:absolute; inset-inline:0; pointer-events:none; background:color-mix(in srgb, var(--pt-guide) 9%, transparent); border-block:1px solid color-mix(in srgb, var(--pt-guide) 45%, transparent)}
+.prog{position:absolute; top:0; inset-inline-start:0; height:2px; width:0; background:var(--pt-guide); pointer-events:none}
+.bar{position:absolute; left:0; right:0; bottom:0; display:flex; flex-wrap:wrap; justify-content:center; gap:6px; padding:18px 8px 6px; opacity:0; transition:opacity .18s; background:linear-gradient(to top, color-mix(in srgb, var(--pt-bg) 94%, transparent) 55%, transparent); pointer-events:none}
+.prompter.hover .bar{opacity:1; pointer-events:auto}
+.bar button{min-height:30px; min-width:30px; padding:0 10px; border-radius:8px; cursor:pointer; background:var(--pt-ui); color:var(--pt-ui-fg); border:1px solid var(--pt-line); font:700 13px var(--font)}
+.bar .play{background:var(--pt-guide); color:var(--pt-guide-fg); border-color:transparent; font-weight:800}
+.bar .lvl{display:flex; align-items:center; gap:4px; color:var(--pt-ui-fg); font-weight:700; font-size:13px; font-variant-numeric:tabular-nums}
+.bar .lvl span{min-width:1.8em; text-align:center}
+@media (prefers-reduced-motion: reduce){ *{scroll-behavior:auto} }
+</style>
+</head>
+<body>
+<div class="page">
+  <h1>ملقّن الاجتماعات</h1>
+  <p class="sub">نافذة عائمة فوق كل البرامج. حطها تحت كاميرا اللابتوب واقرأ وأنت تطالع العدسة.</p>
+
+  <label class="cap" for="text">النص</label>
+  <textarea id="text" dir="auto" spellcheck="false" placeholder="اكتب أو الصق النص هنا"></textarea>
+  <div class="meta"><span id="words"></span><span id="mins"></span></div>
+
+  <section class="settings" aria-label="الإعدادات">
+    <div class="row"><label for="size">حجم الخط</label><input id="size" type="range" min="18" max="80" step="1"><span class="val" id="sizeV"></span></div>
+    <div class="row"><label for="speed">السرعة</label><input id="speed" type="range" min="1" max="12" step="1"><span class="val" id="speedV"></span></div>
+    <div class="row"><label for="winSel">حجم النافذة</label>
+      <select id="winSel">
+        <option value="strip">شريط عريض (يناسب تحت الكاميرا)</option>
+        <option value="mid">متوسطة</option>
+        <option value="big">كبيرة</option>
+      </select>
+    </div>
+  </section>
+
+  <p class="note" id="support" hidden></p>
+  <button class="start" id="open" type="button">افتح النافذة العائمة</button>
+  <p class="status" id="status" role="status"></p>
+
+  <ol class="tips">
+    <li>اسحب النافذة وحطها تحت عدسة الكاميرا مباشرة. تقدر تصغّرها أو تكبّرها من حوافها.</li>
+    <li><strong>لا تشارك الشاشة كاملة في الاجتماع.</strong> شارك نافذة أو تبويباً محدداً، وإلا الحضور يشوفون النص.</li>
+    <li>اضغط على النص للإيقاف والتشغيل. حرّك الماوس فوق النافذة لتظهر الأزرار.</li>
+    <li>اختصارات داخل النافذة: مسافة للإيقاف، سهم لأعلى وأسفل للسرعة، علامة + و− للخط، وR للإعادة من البداية.</li>
+  </ol>
+</div>
+
+<div id="holder" hidden>
+  <div class="prompter" id="prompter">
+    <div class="stage" id="stage">
+      <div class="guide" id="guide"></div>
+      <div class="inner" id="inner"><div class="copy" id="copy" dir="auto"></div></div>
+    </div>
+    <div class="prog" id="prog"></div>
+    <div class="bar" id="bar">
+      <button type="button" class="play" id="pPlay">تشغيل</button>
+      <button type="button" id="pRestart">من البداية</button>
+      <button type="button" id="pSmall" aria-label="تصغير الخط">أ−</button>
+      <button type="button" id="pBig" aria-label="تكبير الخط">أ+</button>
+      <div class="lvl"><button type="button" id="pSlow" aria-label="أبطأ">−</button><span id="pLvl"></span><button type="button" id="pFast" aria-label="أسرع">+</button></div>
+      <button type="button" id="pClose">إغلاق</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  var SAMPLE = "مرحباً بالجميع، وشكراً لحضوركم.\n\nسأعرض عليكم اليوم ملخص النتائج وأهم الخطوات القادمة.\n\nبعد العرض سأفتح المجال لأسئلتكم، وأرحب بأي ملاحظة.\n\nنبدأ على بركة الله.";
+  var KEY = "meeting-prompter-v1";
+  var SIZES = { strip: [680, 170], mid: [520, 260], big: [760, 340] };
+  var st = { text: SAMPLE, size: 30, speed: 5, win: "strip" };
+  try { var sv = JSON.parse(localStorage.getItem(KEY) || "null"); if (sv && typeof sv === "object") { for (var k in st) if (k in sv) st[k] = sv[k]; } } catch (e) {}
+  function save(){ try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (e) {} }
+  function $(id){ return document.getElementById(id); }
+
+  var text = $("text"), size = $("size"), speed = $("speed"), winSel = $("winSel");
+  var openBtn = $("open"), statusEl = $("status"), supportEl = $("support");
+  var holder = $("holder"), prompter = $("prompter"), stage = $("stage"), inner = $("inner"), copy = $("copy"), guide = $("guide"), prog = $("prog");
+  var pPlay = $("pPlay"), pLvl = $("pLvl");
+
+  var host = window, pos = 0, maxPos = 0, playing = false, last = 0, raf = 0, hoverT = 0;
+
+  function sync(){
+    text.value = st.text; size.value = st.size; speed.value = st.speed; winSel.value = st.win;
+    $("sizeV").textContent = st.size; $("speedV").textContent = st.speed;
+    stats();
+  }
+  function stats(){
+    var w = st.text.trim() ? st.text.trim().split(/\s+/).length : 0;
+    $("words").textContent = w + " كلمة";
+    var m = w / 130;
+    $("mins").textContent = w === 0 ? "" : (m < 1 ? "أقل من دقيقة" : "حوالي " + Math.round(m) + " دقيقة");
+  }
+  function setCopy(){ copy.textContent = st.text.trim() ? st.text : "اكتب نصاً أولاً."; }
+
+  if (!("documentPictureInPicture" in window)) {
+    supportEl.hidden = false;
+    supportEl.textContent = "متصفحك لا يدعم النافذة العائمة الحقيقية. تحتاج Chrome أو Edge (الإصدار 116 أو أحدث). سأفتح نافذة عادية بدلاً منها، وهذي ما تبقى فوق البرامج الثانية.";
+  }
+
+  function pxPerSec(){ return st.speed * st.size * 0.11; }
+  function apply(){
+    inner.style.transform = "translateY(" + (-pos) + "px)";
+    prog.style.width = (maxPos > 0 ? Math.min(100, pos / maxPos * 100) : 0) + "%";
+  }
+  function layout(){
+    var h = host.innerHeight || 170;
+    var lh = st.size * 1.6;
+    var top = Math.round(Math.min(h * 0.1, 14));
+    prompter.style.setProperty("--size", st.size + "px");
+    guide.style.top = top + "px";
+    guide.style.height = Math.round(lh) + "px";
+    inner.style.paddingTop = top + "px";
+    maxPos = Math.max(0, copy.offsetHeight - lh);
+    if (pos > maxPos) pos = maxPos;
+    pLvl.textContent = st.speed;
+    apply();
+  }
+  function setPlaying(on){
+    playing = on;
+    pPlay.textContent = on ? "إيقاف" : (pos >= maxPos && maxPos > 0 ? "انتهى" : "تشغيل");
+    host.cancelAnimationFrame(raf);
+    if (on) { last = host.performance.now(); raf = host.requestAnimationFrame(tick); }
+  }
+  function tick(t){
+    if (!playing) return;
+    var dt = Math.min(0.05, (t - last) / 1000); last = t;
+    pos += pxPerSec() * dt;
+    if (pos >= maxPos) { pos = maxPos; apply(); setPlaying(false); return; }
+    apply();
+    raf = host.requestAnimationFrame(tick);
+  }
+  function toggle(){
+    if (!playing && pos >= maxPos && maxPos > 0) { pos = 0; apply(); }
+    setPlaying(!playing);
+  }
+  function setSpeed(v){
+    st.speed = Math.max(1, Math.min(12, v)); speed.value = st.speed;
+    $("speedV").textContent = st.speed; pLvl.textContent = st.speed; save();
+  }
+  function setSize(v){
+    var ratio = pos / Math.max(1, st.size);
+    st.size = Math.max(18, Math.min(80, v)); size.value = st.size;
+    $("sizeV").textContent = st.size; save();
+    layout(); pos = Math.min(maxPos, ratio * st.size); apply();
+  }
+  function showBar(){
+    prompter.classList.add("hover");
+    host.clearTimeout(hoverT);
+    hoverT = host.setTimeout(function(){ prompter.classList.remove("hover"); }, 2200);
+  }
+  function onKey(e){
+    if (e.key === " ") { e.preventDefault(); toggle(); }
+    else if (e.key === "ArrowUp") { e.preventDefault(); setSpeed(st.speed + 1); }
+    else if (e.key === "ArrowDown") { e.preventDefault(); setSpeed(st.speed - 1); }
+    else if (e.key === "+" || e.key === "=") setSize(st.size + 2);
+    else if (e.key === "-" || e.key === "_") setSize(st.size - 2);
+    else if (e.key === "r" || e.key === "R") { pos = 0; apply(); }
+    showBar();
+  }
+
+  async function openFloat(){
+    if (host !== window) { closeFloat(); return; }
+    var dim = SIZES[st.win] || SIZES.strip;
+    var win = null;
+    if ("documentPictureInPicture" in window) {
+      try { win = await documentPictureInPicture.requestWindow({ width: dim[0], height: dim[1] }); } catch (e) { win = null; }
+    }
+    if (!win) {
+      try { win = window.open("", "multaqqin_prompter", "popup=yes,width=" + dim[0] + ",height=" + dim[1]); } catch (e) { win = null; }
+    }
+    if (!win) { statusEl.textContent = "المتصفح منع فتح النافذة. اسمح بالنوافذ المنبثقة لهذه الصفحة وجرّب مرة ثانية."; return; }
+
+    setPlaying(false);
+    host = win;
+    var d = win.document;
+    d.documentElement.lang = "ar";
+    d.documentElement.dir = "rtl";
+    d.title = "ملقّن";
+    Array.prototype.forEach.call(document.querySelectorAll('link[rel="stylesheet"], style'), function(n){ d.head.appendChild(n.cloneNode(true)); });
+    d.body.style.margin = "0";
+    d.body.style.background = "#050807";
+    setCopy();
+    d.body.appendChild(prompter);
+    pos = 0;
+    layout();
+    win.addEventListener("pagehide", closeFloat);
+    win.addEventListener("resize", layout);
+    d.addEventListener("keydown", onKey);
+    d.addEventListener("pointermove", showBar);
+    openBtn.textContent = "أغلق النافذة العائمة";
+    statusEl.textContent = "النافذة مفتوحة. اضغط على النص داخلها لبدء التمرير.";
+    showBar();
+  }
+  function closeFloat(){
+    if (host === window) return;
+    setPlaying(false);
+    var w = host;
+    host = window;
+    try { holder.appendChild(prompter); } catch (e) {}
+    try { w.close(); } catch (e) {}
+    openBtn.textContent = "افتح النافذة العائمة";
+    statusEl.textContent = "";
+  }
+
+  text.addEventListener("input", function(){
+    st.text = text.value; stats(); save();
+    if (host !== window) { setCopy(); layout(); }
+  });
+  size.addEventListener("input", function(){ setSize(+size.value); });
+  speed.addEventListener("input", function(){ setSpeed(+speed.value); });
+  winSel.addEventListener("change", function(){ st.win = winSel.value; save(); });
+  openBtn.addEventListener("click", openFloat);
+
+  $("pPlay").addEventListener("click", toggle);
+  $("pRestart").addEventListener("click", function(){ pos = 0; apply(); if (!playing) setPlaying(true); });
+  $("pSmall").addEventListener("click", function(){ setSize(st.size - 2); });
+  $("pBig").addEventListener("click", function(){ setSize(st.size + 2); });
+  $("pSlow").addEventListener("click", function(){ setSpeed(st.speed - 1); });
+  $("pFast").addEventListener("click", function(){ setSpeed(st.speed + 1); });
+  $("pClose").addEventListener("click", closeFloat);
+
+  var down = false, moved = false, y0 = 0, p0 = 0;
+  stage.addEventListener("pointerdown", function(e){
+    down = true; moved = false; y0 = e.clientY; p0 = pos;
+    try { stage.setPointerCapture(e.pointerId); } catch (x) {}
+  });
+  stage.addEventListener("pointermove", function(e){
+    if (!down) return;
+    var dy = e.clientY - y0;
+    if (!moved && Math.abs(dy) > 6) moved = true;
+    if (moved) { pos = Math.max(0, Math.min(maxPos, p0 - dy)); apply(); }
+  });
+  stage.addEventListener("pointerup", function(){ if (down && !moved) toggle(); down = false; });
+  stage.addEventListener("pointercancel", function(){ down = false; });
+  stage.addEventListener("wheel", function(e){ e.preventDefault(); pos = Math.max(0, Math.min(maxPos, pos + e.deltaY)); apply(); }, { passive: false });
+
+  window.addEventListener("pagehide", function(){ closeFloat(); });
+  setCopy();
+  sync();
+})();
+</script>
+</body>
+</html>

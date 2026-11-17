@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#050807">
+<meta name="description" content="ملقّن مجاني يشتغل من المتصفح: اقرأ نصك وأنت تطالع الكاميرا، مع نافذة عائمة لاجتماعات Zoom وMeet.">
+<title>ملقّن</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap">
+<style>
+/* Layout: hero with a looping prompter demo (camera dot at the top edge), two tool cards, three steps, optional waitlist, footer. */
+:root{
+  --bg:#f3f4f1; --fg:#17201c; --muted:#56635d; --surface:#ffffff; --line:#d3d9d4;
+  --accent:#0b7a5a; --accent-fg:#ffffff;
+  --pt-bg:#050807; --pt-fg:#f5f7f4; --pt-guide:#e8b73a;
+  --font:'Tajawal',system-ui,'Segoe UI',Tahoma,sans-serif;
+  padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0f1512; --fg:#e8ede9; --muted:#93a19a; --surface:#17201b; --line:#2a3630;
+    --accent:#3ccf9b; --accent-fg:#04140d; color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0f1512; --fg:#e8ede9; --muted:#93a19a; --surface:#17201b; --line:#2a3630;
+  --accent:#3ccf9b; --accent-fg:#04140d; color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{
+  margin:0; background:var(--bg); color:var(--fg); font-family:var(--font); font-size:17px; line-height:1.7;
+  padding-left:max(18px, env(safe-area-inset-left, 0px)); padding-right:max(18px, env(safe-area-inset-right, 0px)); padding-block:0;
+}
+.wrap{max-width:980px; margin:0 auto}
+header.top{padding-top:22px; font-weight:800; font-size:22px}
+.hero{display:grid; grid-template-columns:minmax(0,1.1fr) minmax(0,1fr); gap:32px; align-items:center; padding:40px 0 28px}
+@media (max-width:760px){ .hero{grid-template-columns:minmax(0,1fr); padding-top:26px} }
+h1{font-size:clamp(34px, 6vw, 54px); line-height:1.25; font-weight:800; margin:0 0 14px; text-wrap:balance}
+.lead{margin:0 0 22px; color:var(--muted); font-size:19px; text-wrap:balance}
+.btn{display:inline-flex; align-items:center; justify-content:center; min-height:52px; padding:0 24px; border-radius:12px; border:0; background:var(--accent); color:var(--accent-fg); font:800 18px var(--font); text-decoration:none; cursor:pointer}
+.btn.alt{background:transparent; color:var(--fg); border:1px solid var(--line)}
+.btns{display:flex; flex-wrap:wrap; gap:10px}
+a:focus-visible, .btn:focus-visible{outline:3px solid var(--accent); outline-offset:3px}
+
+.demo{position:relative; height:150px; border-radius:16px; background:var(--pt-bg); overflow:hidden; border:1px solid var(--line)}
+.demo .cam{position:absolute; top:6px; left:50%; width:10px; height:10px; margin-left:-5px; border-radius:50%; background:#2b3832; box-shadow:0 0 0 3px #141b17; z-index:2}
+.demo .guide{position:absolute; inset-inline:0; top:20px; height:44px; background:color-mix(in srgb, var(--pt-guide) 10%, transparent); border-block:1px solid color-mix(in srgb, var(--pt-guide) 45%, transparent)}
+.demo .lines{position:absolute; inset-inline:0; top:20px; text-align:center; color:var(--pt-fg); font-weight:700; font-size:18px; line-height:44px; white-space:nowrap; animation:roll 12s linear infinite}
+@keyframes roll{from{transform:translateY(0)} to{transform:translateY(-176px)}}
+@media (prefers-reduced-motion: reduce){ .demo .lines{animation:none} }
+.demo-cap{margin:8px 0 0; font-size:14px; color:var(--muted); text-align:center}
+
+h2{font-size:28px; font-weight:800; margin:0 0 16px}
+section{padding:26px 0}
+.cards{display:grid; grid-template-columns:repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap:16px}
+.card{display:flex; flex-direction:column; gap:12px; padding:22px; background:var(--surface); border:1px solid var(--line); border-radius:16px}
+.card h3{margin:0; font-size:22px; font-weight:800}
+.card p{margin:0; color:var(--muted); flex:1}
+.card .small{font-size:14px; flex:0}
+
+.steps{display:grid; gap:14px; padding:0; margin:0; list-style:none; counter-reset:s}
+.steps li{display:grid; grid-template-columns:2.4rem minmax(0,1fr); gap:12px; align-items:start}
+.steps li::before{counter-increment:s; content:counter(s); display:grid; place-items:center; width:2.4rem; height:2.4rem; border-radius:50%; background:var(--accent); color:var(--accent-fg); font-weight:800}
+.install{padding:18px 20px; border:1px dashed var(--line); border-radius:14px; color:var(--muted); font-size:16px}
+.install strong{color:var(--fg)}
+.wait{padding:26px; border-radius:16px; background:var(--surface); border:1px solid var(--line); display:grid; gap:12px; justify-items:start}
+.wait p{margin:0; color:var(--muted)}
+footer{padding:28px 0 36px; color:var(--muted); font-size:15px; display:flex; flex-wrap:wrap; gap:8px 24px; justify-content:space-between; border-top:1px solid var(--line); margin-top:16px}
+footer a{color:var(--accent); font-weight:700}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">ملقّن</header>
+
+  <div class="hero">
+    <div>
+      <h1>اقرأ نصك وأنت تطالع الكاميرا</h1>
+      <p class="lead">ملقّن مجاني يشتغل من المتصفح، بدون تسجيل وبدون تحميل. الصق النص وينزل لحاله بالسرعة اللي تبيها.</p>
+      <div class="btns">
+        <a class="btn" href="app.html">افتح الملقّن</a>
+        <a class="btn alt" href="meeting.html">ملقّن الاجتماعات</a>
+      </div>
+    </div>
+    <div>
+      <div class="demo" aria-hidden="true">
+        <div class="cam"></div>
+        <div class="guide"></div>
+        <div class="lines">
+          <div>مرحباً بالجميع، وشكراً لحضوركم.</div>
+          <div>سأعرض عليكم اليوم ملخص النتائج</div>
+          <div>وأهم الخطوات القادمة.</div>
+          <div>نبدأ على بركة الله.</div>
+          <div>مرحباً بالجميع، وشكراً لحضوركم.</div>
+          <div>سأعرض عليكم اليوم ملخص النتائج</div>
+          <div>وأهم الخطوات القادمة.</div>
+          <div>نبدأ على بركة الله.</div>
+        </div>
+      </div>
+      <p class="demo-cap">أول سطر قريب من عدسة الكاميرا</p>
+    </div>
+  </div>
+
+  <section aria-labelledby="tools">
+    <h2 id="tools">اختر أداتك</h2>
+    <div class="cards">
+      <div class="card">
+        <h3>ملقّن النصوص</h3>
+        <p>للتصوير والخطابة. تتحكم بحجم الخط والسرعة، مع عدّ تنازلي قبل البدء وخيار عكس النص للزجاج العاكس. يشتغل على الجوال والآيباد واللابتوب.</p>
+        <a class="btn" href="app.html">افتح ملقّن النصوص</a>
+      </div>
+      <div class="card">
+        <h3>ملقّن الاجتماعات</h3>
+        <p>نافذة عائمة تبقى فوق Zoom وMeet وTeams. حطها تحت كاميرا اللابتوب واقرأ عرضك وأنت تطالع العدسة.</p>
+        <p class="small">تحتاج Chrome أو Edge على اللابتوب. لا تشارك الشاشة كاملة أثناء الاجتماع، شارك نافذة محددة.</p>
+        <a class="btn" href="meeting.html">افتح ملقّن الاجتماعات</a>
+      </div>
+    </div>
+  </section>
+
+  <section aria-labelledby="how">
+    <h2 id="how">كيف يشتغل</h2>
+    <ol class="steps">
+      <li>الصق نصك في الصفحة.</li>
+      <li>اضبط حجم الخط والسرعة على راحتك.</li>
+      <li>اضغط ابدأ وأنت تطالع الكاميرا. اضغط على الشاشة للإيقاف والتشغيل.</li>
+    </ol>
+  </section>
+
+  <section>
+    <div class="install">
+      <strong>تثبيته كتطبيق على جوالك:</strong>
+      في آيفون وآيباد افتح الموقع في Safari، اضغط زر المشاركة ثم <strong>إضافة إلى الشاشة الرئيسية</strong>. في أندرويد افتحه في Chrome، من القائمة اختر <strong>إضافة إلى الشاشة الرئيسية</strong>.
+    </div>
+  </section>
+
+  <section id="waitlist-section" hidden>
+    <div class="wait">
+      <h2>تطبيق للجوال قريباً؟</h2>
+      <p>إذا تبي تطبيقاً في App Store وGoogle Play، سجّل اهتمامك ونبلغك إذا نزل.</p>
+      <a class="btn" id="waitlist-link" href="#" rel="noopener" target="_blank">سجّل اهتمامي</a>
+    </div>
+  </section>
+
+  <footer>
+    <span>نصوصك تبقى على جهازك ولا تُرسل لأي مكان.</span>
+    <a href="privacy.html">سياسة الخصوصية</a>
+  </footer>
+</div>
+
+<script>
+/* ضع رابط نموذج Google Forms هنا لتظهر خانة التسجيل. اتركه فارغاً لإخفائها. */
+var WAITLIST_URL = "";
+(function(){
+  if (WAITLIST_URL) {
+    document.getElementById("waitlist-link").href = WAITLIST_URL;
+    document.getElementById("waitlist-section").hidden = false;
+  }
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", function(){ navigator.serviceWorker.register("sw.js").catch(function(){}); });
+  }
+})();
+</script>
+</body>
+</html>

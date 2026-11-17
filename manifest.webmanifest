@@ -1,0 +1,38 @@
+{
+  "id": "./app.html",
+  "name": "ملقّن",
+  "short_name": "ملقّن",
+  "lang": "ar",
+  "dir": "rtl",
+  "description": "ملقّن نصوص: الصق النص وينزل تلقائياً بسرعة وحجم خط تتحكم فيهم.",
+  "start_url": "./app.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#050807",
+  "theme_color": "#050807",
+  "categories": [
+    "productivity",
+    "utilities"
+  ],
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
